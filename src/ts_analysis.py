@@ -118,11 +118,6 @@ def cancellations_for_product(df_raw: pd.DataFrame, stock_code: str) -> pd.Serie
 # --------------------------------------------------------------------------------------
 # 2. Построение временных рядов
 # --------------------------------------------------------------------------------------
-def store_working_days(df_clean: pd.DataFrame) -> pd.DatetimeIndex:
-    """Дни, когда магазин работал = дни, в которые был хотя бы один счёт по ЛЮБОМУ товару."""
-    return pd.DatetimeIndex(sorted(df_clean["Date"].unique()))
-
-
 def build_daily_series(df_clean: pd.DataFrame, stock_code: str) -> pd.DataFrame:
     """
     Дневной ряд по товару на полном календаре.
@@ -131,7 +126,8 @@ def build_daily_series(df_clean: pd.DataFrame, stock_code: str) -> pd.DataFrame:
       * день, когда магазин работал, но товар не купили  -> 0 (реальное отсутствие спроса);
       * день, когда магазин не работал (нет ни одного счёта) -> NaN (наблюдения не существует).
     """
-    working = store_working_days(df_clean)
+    # рабочие дни магазина = дни, в которые был хотя бы один счёт по любому товару
+    working = pd.DatetimeIndex(df_clean["Date"].unique())
     full_idx = pd.date_range(working.min(), working.max(), freq="D")
     p = df_clean[df_clean["StockCode"] == stock_code]
 
@@ -409,12 +405,6 @@ def country_structure(df_clean: pd.DataFrame, stock_code: str, top: int = 5) -> 
     t = p.groupby("Country")["Quantity"].sum().sort_values(ascending=False)
     out = pd.DataFrame({"quantity": t, "share, %": (100 * t / t.sum()).round(1)})
     return out.head(top)
-
-
-def order_size_profile(df_clean: pd.DataFrame, stock_code: str) -> pd.Series:
-    """Распределение размера одной строки заказа: показывает оптовую природу продаж."""
-    q = df_clean.loc[df_clean["StockCode"] == stock_code, "Quantity"]
-    return q.describe(percentiles=[0.5, 0.9, 0.99]).round(1)
 
 
 # --------------------------------------------------------------------------------------
