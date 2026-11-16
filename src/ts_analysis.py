@@ -23,7 +23,6 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.tsa.seasonal import STL
 from statsmodels.tsa.stattools import acf, adfuller, kpss
 
-DATA_URL = "https://archive.ics.uci.edu/static/public/352/online+retail.zip"
 FREQ_NAMES = {"D": "день", "W": "неделя", "M": "месяц"}
 WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
@@ -37,7 +36,7 @@ def load_online_retail(data_dir: str | Path = "data") -> pd.DataFrame:
     xlsx_path = data_dir / "Online Retail.xlsx"
     if not xlsx_path.exists():
         data_dir.mkdir(parents=True, exist_ok=True)
-        zip_path, _ = urllib.request.urlretrieve(DATA_URL, data_dir / "online_retail.zip")
+        zip_path, _ = urllib.request.urlretrieve("https://archive.ics.uci.edu/static/public/352/online+retail.zip", data_dir / "online_retail.zip")
         zipfile.ZipFile(zip_path).extractall(data_dir)
 
     df = pd.read_excel(xlsx_path, dtype={"InvoiceNo": str, "StockCode": str})
@@ -65,24 +64,22 @@ def clean_transactions(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     Удаляются (и учитываются в отчёте):
       * отмены — номер счёта начинается с 'C' (отрицательное Quantity);
       * прочие строки с Quantity <= 0 (корректировки склада, списания);
-      * строки с UnitPrice <= 0 (бесплатные отгрузки / ошибки ввода);
-      * точные дубликаты строк.
+      * строки с UnitPrice <= 0 (бесплатные отгрузки, списания долгов).
+    Совпадающие строки НЕ удаляются: в датасете нет идентификатора строки,
+    поэтому их нельзя отличить от повторной позиции в том же счёте.
     Возвращает (очищенный df, отчёт о количестве удалённых строк).
     """
     is_cancel = df["InvoiceNo"].str.startswith("C")
     nonpos_qty = (df["Quantity"] <= 0) & ~is_cancel
     nonpos_price = (df["UnitPrice"] <= 0) & ~is_cancel & ~nonpos_qty
-    duplicated = df.duplicated() & ~is_cancel & ~nonpos_qty & ~nonpos_price
 
     report = pd.DataFrame(
-        {
-            "rows": [is_cancel.sum(), nonpos_qty.sum(), nonpos_price.sum(), duplicated.sum()],
-        },
-        index=["Отмены (InvoiceNo = C...)", "Quantity <= 0 (не отмены)", "UnitPrice <= 0", "Полные дубликаты"],
+        {"rows": [is_cancel.sum(), nonpos_qty.sum(), nonpos_price.sum()]},
+        index=["Отмены (InvoiceNo = C...)", "Quantity <= 0 (не отмены)", "UnitPrice <= 0"],
     )
     report["share"] = (report["rows"] / len(df)).round(4)
 
-    clean = df[~(is_cancel | nonpos_qty | nonpos_price | duplicated)].copy()
+    clean = df[~(is_cancel | nonpos_qty | nonpos_price)].copy()
     clean["Revenue"] = clean["Quantity"] * clean["UnitPrice"]
     clean["Date"] = clean["InvoiceDate"].dt.normalize()
     return clean, report
