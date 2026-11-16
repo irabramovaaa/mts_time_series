@@ -418,9 +418,9 @@ def stl_decompose(s: pd.Series, period: int, robust: bool = True):
 
 def decomposition_strength(res) -> pd.Series:
     """
-    Сила тренда и сезонности по Hyndman & Athanasopoulos (FPP3):
+    Сила тренда и сезонности: какую долю колебаний компонента объясняет по сравнению с остатком.
         F_T = max(0, 1 − Var(R) / Var(T + R)),  F_S = max(0, 1 − Var(R) / Var(S + R)).
-    F_S > ~0.64 обычно трактуют как выраженную сезонность, < ~0.4 — как слабую.
+    Чем ближе к 1, тем сильнее компонента; около 0 — компонента почти не выделяется на фоне шума.
     """
     r, t, sn = res.resid, res.trend, res.seasonal
     ft = max(0.0, 1 - np.var(r) / np.var(t + r))
