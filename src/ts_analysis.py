@@ -11,7 +11,6 @@
 """
 from __future__ import annotations
 
-import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -32,41 +31,17 @@ WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 # --------------------------------------------------------------------------------------
 # 1. Загрузка и очистка
 # --------------------------------------------------------------------------------------
-def download_online_retail(data_dir: str | Path = "data", retries: int = 5) -> Path:
-    """Скачивает датасет Online Retail с UCI (если его ещё нет) и возвращает путь к .xlsx."""
-    data_dir = Path(data_dir)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    xlsx_path = data_dir / "Online Retail.xlsx"
-    if xlsx_path.exists():
-        return xlsx_path
-
-    zip_path = data_dir / "online_retail.zip"
-    for attempt in range(1, retries + 1):
-        try:
-            urllib.request.urlretrieve(DATA_URL, zip_path)
-            with zipfile.ZipFile(zip_path) as zf:
-                zf.extractall(data_dir)
-            break
-        except Exception as exc:  # сервер UCI иногда обрывает соединение
-            print(f"Попытка {attempt} не удалась: {exc}")
-            time.sleep(3)
-    else:
-        raise RuntimeError("Не удалось скачать датасет, скачайте вручную: " + DATA_URL)
-    return xlsx_path
-
-
 def load_online_retail(data_dir: str | Path = "data") -> pd.DataFrame:
-    """Читает датасет (с кэшированием в pickle, т.к. чтение xlsx занимает ~1 мин)."""
+    """Читает датасет Online Retail; если файла нет — скачивает его с UCI."""
     data_dir = Path(data_dir)
-    cache = data_dir / "online_retail.pkl"
-    if cache.exists():
-        return pd.read_pickle(cache)
+    xlsx_path = data_dir / "Online Retail.xlsx"
+    if not xlsx_path.exists():
+        data_dir.mkdir(parents=True, exist_ok=True)
+        zip_path, _ = urllib.request.urlretrieve(DATA_URL, data_dir / "online_retail.zip")
+        zipfile.ZipFile(zip_path).extractall(data_dir)
 
-    xlsx_path = download_online_retail(data_dir)
     df = pd.read_excel(xlsx_path, dtype={"InvoiceNo": str, "StockCode": str})
-    df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
     df["StockCode"] = df["StockCode"].str.strip().str.upper()
-    df.to_pickle(cache)
     return df
 
 
